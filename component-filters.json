@@ -9,10 +9,12 @@
     "id": "section",
     "components": [
       "button",
+      "action-button",
       "cards",
       "carousel",
       "columns",
       "contentfragment",
+      "button",
       "dm-asset",
       "dm-template",
       "fragment",
@@ -22,9 +24,18 @@
       "text",
       "title",
       "video",
+      "search",
       "separator",
       "form",
+      "forex",
+      "accordion",
       "embed-adaptive-form"
+    ]
+  },
+  {
+    "id": "accordion",
+    "components": [
+      "accordion-item"
     ]
   },
   {

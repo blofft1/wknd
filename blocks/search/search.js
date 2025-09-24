@@ -1,10 +1,24 @@
 import {
   createOptimizedPicture,
-  decorateIcons,
+  decorateIcons
 } from '../../scripts/aem.js';
 import { fetchPlaceholders } from '../../scripts/placeholders.js';
+import { getLanguage } from '../../scripts/utils.js';
 
 const searchParams = new URLSearchParams(window.location.search);
+
+// --- Utilities ---
+function debounce(fn, delay = 200) {
+  let timerId;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function safeText(value) {
+  return typeof value === 'string' ? value : '';
+}
 
 function findNextHeading(el) {
   let preceedingEl = el.parentElement.previousElement || el.parentElement.parentElement;
@@ -19,6 +33,8 @@ function findNextHeading(el) {
       preceedingEl = preceedingEl.previousElement || preceedingEl.parentElement;
     }
   }
+  // Default down to H4 to avoid very large headings inside result cards
+  if (h === 'H2') return 'H4';
   return h;
 }
 
@@ -65,25 +81,99 @@ function highlightTextElements(terms, elements) {
   });
 }
 
-export async function fetchData(source) {
-  const response = await fetch(source);
-  if (!response.ok) {
-    // eslint-disable-next-line no-console
-    console.error('error loading API response', response);
-    return null;
+function getSnippet(result, searchTerms, searchPhrase) {
+  const sourceText = (result.body || result.description || '').trim();
+  if (!sourceText) return '';
+  const lc = sourceText.toLowerCase();
+  let bestIdx = -1;
+  // Prefer exact phrase if present
+  if (searchPhrase && searchPhrase.length >= 2) {
+    const phraseIdx = lc.indexOf(searchPhrase);
+    if (phraseIdx >= 0) bestIdx = phraseIdx;
   }
-
-  const json = await response.json();
-  if (!json) {
-    // eslint-disable-next-line no-console
-    console.error('empty API response', source);
-    return null;
+  searchTerms.forEach((t) => {
+    const idx = lc.indexOf(t.toLowerCase());
+    if (idx >= 0 && (bestIdx === -1 || idx < bestIdx)) bestIdx = idx;
+  });
+  let start = 0;
+  let end = Math.min(sourceText.length, 180);
+  if (bestIdx >= 0) {
+    start = Math.max(0, bestIdx - 60);
+    end = Math.min(sourceText.length, bestIdx + 120);
   }
-
-  return json.data;
+  let snippet = sourceText.slice(start, end).replace(/\s+/g, ' ').trim();
+  if (start > 0) snippet = `… ${snippet}`;
+  if (end < sourceText.length) snippet = `${snippet} …`;
+  return snippet;
 }
 
-function renderResult(result, searchTerms, titleTag) {
+export async function fetchData(source) {
+  try {
+    const response = await fetch(source, { credentials: 'same-origin' });
+    if (!response.ok) {
+      // eslint-disable-next-line no-console
+      console.error('[search] error loading index:', response.status, response.statusText);
+      return [];
+    }
+    const json = await response.json();
+    if (!json || !Array.isArray(json.data)) return [];
+    return json.data;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[search] fetchData failed', e);
+    return [];
+  }
+}
+
+function applySearchPathFilter(data, searchPath) {
+  const list = Array.isArray(data) ? data : [];
+  const prefix = (searchPath || '').trim().toLowerCase();
+  if (!prefix || prefix === '/' || prefix === '*') return list;
+  return list.filter((r) => typeof r?.path === 'string' && r.path.toLowerCase().startsWith(prefix));
+}
+
+function deriveScopeFromRaw(raw) {
+  const value = (raw || '').trim();
+  if (!value) return '';
+  const marker = '/language-masters/';
+  const idx = value.indexOf(marker);
+  if (idx >= 0) {
+    const after = value.slice(idx + marker.length);
+    const lang = (after.split('/')[0] || '').trim();
+    return lang ? `/${lang}` : '';
+  }
+  if (value.startsWith('/')) {
+    const seg = value.split('/').filter(Boolean)[0] || '';
+    return seg ? `/${seg}` : '';
+  }
+  return '';
+}
+
+function getScopedPrefix(block) {
+  // forwarded scope from overlay → search page takes precedence
+  if (block && typeof block._forwardedScope === 'string' && block._forwardedScope) return block._forwardedScope;
+  try {
+    const a = block.querySelector(':scope > div:nth-child(1) .button-container a[href]');
+    const raw = (a?.textContent || a?.getAttribute('href') || '').trim();
+    return deriveScopeFromRaw(raw);
+  } catch (e) { /* noop */ }
+  return '';
+}
+
+function attachScopeParam(url, scope) {
+  if (!url || !scope) return;
+  if (scope !== '/') url.searchParams.set('sp', scope);
+}
+
+function isExcludedResult(result) {
+  const path = safeText(result.path).toLowerCase();
+  const robots = safeText(result.robots).toLowerCase();
+  if (robots.includes('noindex')) return true;
+  if (/\/(nav|footer)$/i.test(path)) return true;
+  return false;
+}
+
+function renderResult(result, searchTerms, searchPhrase, titleTag) {
   const li = document.createElement('li');
   const a = document.createElement('a');
   a.href = result.path;
@@ -94,19 +184,21 @@ function renderResult(result, searchTerms, titleTag) {
     wrapper.append(pic);
     a.append(wrapper);
   }
-  if (result.title) {
+  const displayTitle = result.navTitle || result.title;
+  if (displayTitle) {
     const title = document.createElement(titleTag);
     title.className = 'search-result-title';
     const link = document.createElement('a');
     link.href = result.path;
-    link.textContent = result.title;
+    link.textContent = displayTitle;
     highlightTextElements(searchTerms, [link]);
     title.append(link);
     a.append(title);
   }
-  if (result.description) {
+  const snippetText = getSnippet(result, searchTerms, searchPhrase);
+  if (snippetText) {
     const description = document.createElement('p');
-    description.textContent = result.description;
+    description.textContent = snippetText;
     highlightTextElements(searchTerms, [description]);
     a.append(description);
   }
@@ -121,6 +213,15 @@ function clearSearchResults(block) {
 
 function clearSearch(block) {
   clearSearchResults(block);
+  const dropdown = block.querySelector('.search-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+  if (dropdown && dropdown.parentElement) dropdown.parentElement.classList.remove('open');
+  // collapse expanded mode if present
+  if (block.classList.contains('expanded')) {
+    block.classList.remove('expanded');
+    const expanded = block.querySelector('.search-expanded');
+    if (expanded) expanded.remove();
+  }
   if (window.history.replaceState) {
     const url = new URL(window.location.href);
     url.search = '';
@@ -129,22 +230,31 @@ function clearSearch(block) {
   }
 }
 
-async function renderResults(block, config, filteredData, searchTerms) {
+async function renderResults(block, config, filteredData, searchTerms, searchPhrase) {
   clearSearchResults(block);
   const searchResults = block.querySelector('.search-results');
   const headingTag = searchResults.dataset.h;
+  const dropdown = block.querySelector('.search-dropdown');
 
   if (filteredData.length) {
     searchResults.classList.remove('no-results');
     filteredData.forEach((result) => {
-      const li = renderResult(result, searchTerms, headingTag);
+      const li = renderResult(result, searchTerms, searchPhrase, headingTag);
       searchResults.append(li);
     });
+    if (dropdown) {
+      dropdown.classList.add('open');
+      if (dropdown.parentElement) dropdown.parentElement.classList.add('open');
+    }
   } else {
     const noResultsMessage = document.createElement('li');
     searchResults.classList.add('no-results');
     noResultsMessage.textContent = config.placeholders.searchNoResults || 'No results found.';
     searchResults.append(noResultsMessage);
+    if (dropdown) {
+      dropdown.classList.add('open');
+      if (dropdown.parentElement) dropdown.parentElement.classList.add('open');
+    }
   }
 }
 
@@ -152,15 +262,16 @@ function compareFound(hit1, hit2) {
   return hit1.minIdx - hit2.minIdx;
 }
 
-function filterData(searchTerms, data) {
+function filterData(searchTerms, data, searchPhrase) {
   const foundInHeader = [];
   const foundInMeta = [];
+  const foundByPhrase = [];
 
-  data.forEach((result) => {
+  (Array.isArray(data) ? data : []).forEach((result) => {
     let minIdx = -1;
 
     searchTerms.forEach((term) => {
-      const idx = (result.header || result.title).toLowerCase().indexOf(term);
+      const idx = safeText(result.header || result.navTitle).toLowerCase().indexOf(term);
       if (idx < 0) return;
       if (minIdx < idx) minIdx = idx;
     });
@@ -170,7 +281,16 @@ function filterData(searchTerms, data) {
       return;
     }
 
-    const metaContents = `${result.title} ${result.description} ${result.path.split('/').pop()}`.toLowerCase();
+    const metaContents = `${safeText(result.navTitle || result.title)} ${safeText(result.description)} ${safeText(result.body)} ${safeText(result.path)?.split('/').pop() || ''}`.toLowerCase();
+
+    // Prefer exact phrase match across meta contents
+    if (searchPhrase && searchPhrase.length >= 2) {
+      const phraseIdx = metaContents.indexOf(searchPhrase);
+      if (phraseIdx >= 0) {
+        foundByPhrase.push({ minIdx: phraseIdx, result });
+        return;
+      }
+    }
     searchTerms.forEach((term) => {
       const idx = metaContents.indexOf(term);
       if (idx < 0) return;
@@ -183,13 +303,17 @@ function filterData(searchTerms, data) {
   });
 
   return [
+    ...foundByPhrase.sort(compareFound),
     ...foundInHeader.sort(compareFound),
     ...foundInMeta.sort(compareFound),
   ].map((item) => item.result);
 }
 
-async function handleSearch(e, block, config) {
-  const searchValue = e.target.value;
+async function handleSearchImpl(e, block, config) {
+  const inputEl = block?.querySelector?.('input.search-input');
+  const searchValue = (e && e.target && typeof e.target.value === 'string'
+    ? e.target.value
+    : (inputEl && typeof inputEl.value === 'string' ? inputEl.value : '')) || '';
   searchParams.set('q', searchValue);
   if (window.history.replaceState) {
     const url = new URL(window.location.href);
@@ -201,12 +325,17 @@ async function handleSearch(e, block, config) {
     clearSearch(block);
     return;
   }
-  const searchTerms = searchValue.toLowerCase().split(/\s+/).filter((term) => !!term);
+  const searchPhrase = searchValue.toLowerCase().trim();
+  const searchTerms = searchPhrase.split(/\s+/).filter((term) => term && term.length >= 3);
 
-  const data = await fetchData(config.source);
-  const filteredData = filterData(searchTerms, data);
-  await renderResults(block, config, filteredData, searchTerms);
+  const authoredPrefix = getScopedPrefix(block);
+  const data = (await fetchData(config.source)).filter((r) => !isExcludedResult(r));
+  const scoped = applySearchPathFilter(data, authoredPrefix);
+  const filteredData = filterData(searchTerms, scoped, searchPhrase);
+  await renderResults(block, config, filteredData, searchTerms, searchPhrase);
 }
+
+const handleSearch = debounce(handleSearchImpl, 150);
 
 function searchResultsContainer(block) {
   const results = document.createElement('ul');
@@ -224,9 +353,14 @@ function searchInput(block, config) {
   input.placeholder = searchPlaceholder;
   input.setAttribute('aria-label', searchPlaceholder);
 
-  input.addEventListener('input', (e) => {
-    handleSearch(e, block, config);
-  });
+  // Only attach suggestion handler for icon variant (overlay).
+  // For search-bar variant, we disable suggestions and rely on Enter to expand.
+  const isIconVariant = block.classList.contains('search-icon');
+  if (isIconVariant) {
+    input.addEventListener('input', (e) => {
+      handleSearch(e, block, config);
+    });
+  }
 
   input.addEventListener('keyup', (e) => { if (e.code === 'Escape') { clearSearch(block); } });
 
@@ -242,28 +376,423 @@ function searchIcon() {
 function searchBox(block, config) {
   const box = document.createElement('div');
   box.classList.add('search-box');
-  box.append(
-    searchIcon(),
-    searchInput(block, config),
-  );
+  const input = searchInput(block, config);
+  const icon = searchIcon();
+  const isIconVariant = block.classList.contains('search-icon');
+  if (isIconVariant) {
+    const dropdown = document.createElement('div');
+    dropdown.className = 'search-dropdown';
+    const results = searchResultsContainer(block);
+    dropdown.append(results);
+    box.append(
+      input,
+      icon,
+      dropdown,
+    );
+  } else {
+    box.append(
+      input,
+      icon,
+    );
+  }
 
   return box;
 }
 
+// --- Expanded (inline) results mode for search-bar variant ---
+function buildExpandedLayout(block) {
+  let expanded = block.querySelector('.search-expanded');
+  if (expanded) return {
+    expanded,
+    filters: expanded.querySelector('.search-filters'),
+    results: expanded.querySelector('.search-expanded-results .search-results'),
+  };
+
+  expanded = document.createElement('div');
+  expanded.className = 'search-expanded';
+
+  const filters = document.createElement('aside');
+  filters.className = 'search-filters';
+
+  const resultsWrap = document.createElement('div');
+  resultsWrap.className = 'search-expanded-results';
+  const results = document.createElement('ul');
+  results.className = 'search-results';
+  results.dataset.h = findNextHeading(block);
+  resultsWrap.append(results);
+
+  expanded.append(filters, resultsWrap);
+  block.append(expanded);
+  return { expanded, filters, results };
+}
+
+function normalizeTimestamp(value) {
+  if (!value && value !== 0) return NaN;
+  if (typeof value === 'number') {
+    // if seconds, convert to ms
+    return value < 1e12 ? value * 1000 : value;
+  }
+  const ms = Date.parse(value);
+  if (!Number.isNaN(ms)) return ms;
+  const asNum = Number(value);
+  if (!Number.isNaN(asNum)) return normalizeTimestamp(asNum);
+  return NaN;
+}
+
+function getResultTimestamp(result) {
+  const primary = normalizeTimestamp(result.publishDate);
+  const fallback = normalizeTimestamp(result.lastModified);
+  if (!Number.isNaN(primary)) return primary;
+  if (!Number.isNaN(fallback)) return fallback;
+  return NaN;
+}
+
+// Specific timestamp getters for distinct filters
+function getPublishedTimestamp(result) {
+  return normalizeTimestamp(result.publishDate);
+}
+
+function getModifiedTimestamp(result) {
+  return normalizeTimestamp(result.lastModified);
+}
+
+function applyDateFilter(data, dateRange, getResultTimestamp) {
+  if (!dateRange || dateRange === 'any') return data;
+  const now = Date.now();
+  const ranges = { '24h': 24 * 60 * 60 * 1000, '7d': 7 * 24 * 60 * 60 * 1000, '30d': 30 * 24 * 60 * 60 * 1000 };
+  const windowMs = ranges[dateRange];
+  if (!windowMs) return data;
+  return data.filter((r) => {
+    const ts = getResultTimestamp(r);
+    if (Number.isNaN(ts)) return false;
+    return (now - ts) <= windowMs;
+  });
+}
+
+function renderDateFilters(container, selected, onChange) {
+  const group = document.createElement('div');
+  group.className = 'filter-group date-range';
+  const title = document.createElement('h4');
+  title.textContent = 'Published';
+  group.append(title);
+
+  const options = [
+    { key: 'any', label: 'Any time' },
+    { key: '24h', label: 'Last 24 hours' },
+    { key: '7d', label: 'Last week' },
+    { key: '30d', label: 'Last month' },
+  ];
+  const name = `date-range-${Math.random().toString(36).slice(2)}`;
+  options.forEach((opt, idx) => {
+    const id = `${name}-${idx}`;
+    const label = document.createElement('label');
+    const rb = document.createElement('input');
+    rb.type = 'radio';
+    rb.name = name;
+    rb.id = id;
+    rb.checked = (selected || 'any') === opt.key;
+    rb.addEventListener('change', () => onChange(opt.key));
+    label.append(rb, document.createTextNode(` ${opt.label}`));
+    group.append(label);
+  });
+  container.append(group);
+}
+
+function renderModifiedFilters(container, selected, onChange) {
+  const group = document.createElement('div');
+  group.className = 'filter-group date-range modified-range';
+  const title = document.createElement('h4');
+  title.textContent = 'Modified';
+  group.append(title);
+
+  const options = [
+    { key: 'any', label: 'Any time' },
+    { key: '24h', label: 'Last 24 hours' },
+    { key: '7d', label: 'Last week' },
+    { key: '30d', label: 'Last month' },
+  ];
+  const name = `modified-range-${Math.random().toString(36).slice(2)}`;
+  options.forEach((opt, idx) => {
+    const id = `${name}-${idx}`;
+    const label = document.createElement('label');
+    const rb = document.createElement('input');
+    rb.type = 'radio';
+    rb.name = name;
+    rb.id = id;
+    rb.checked = (selected || 'any') === opt.key;
+    rb.addEventListener('change', () => onChange(opt.key));
+    label.append(rb, document.createTextNode(` ${opt.label}`));
+    group.append(label);
+  });
+  container.append(group);
+}
+
+function applyAllFilters(base, selectedPublishedRange, selectedModifiedRange) {
+  const byPublished = applyDateFilter(base, selectedPublishedRange, getPublishedTimestamp);
+  const byModified = applyDateFilter(byPublished, selectedModifiedRange, getModifiedTimestamp);
+  return byModified;
+}
+
+function renderSortControls(container, selected, onChange) {
+  const group = document.createElement('div');
+  group.className = 'filter-group sort-order';
+  const title = document.createElement('h4');
+  title.textContent = 'Sort';
+  group.append(title);
+
+  const options = [
+    { key: 'relevance', label: 'Relevance' },
+    { key: 'az', label: 'Title A–Z' },
+    { key: 'za', label: 'Title Z–A' },
+  ];
+  const name = `sort-order-${Math.random().toString(36).slice(2)}`;
+  options.forEach((opt, idx) => {
+    const id = `${name}-${idx}`;
+    const label = document.createElement('label');
+    const rb = document.createElement('input');
+    rb.type = 'radio';
+    rb.name = name;
+    rb.id = id;
+    rb.checked = (selected || 'relevance') === opt.key;
+    rb.addEventListener('change', () => onChange(opt.key));
+    label.append(rb, document.createTextNode(` ${opt.label}`));
+    group.append(label);
+  });
+  container.append(group);
+}
+
+function applySort(results, order) {
+  if (!Array.isArray(results) || !results.length) return results;
+  if (order === 'az' || order === 'za') {
+    const copy = [...results];
+    copy.sort((a, b) => {
+      const at = (a.navTitle || a.title || '').toLowerCase();
+      const bt = (b.navTitle || b.title || '').toLowerCase();
+      if (at < bt) return -1;
+      if (at > bt) return 1;
+      return 0;
+    });
+    return order === 'az' ? copy : copy.reverse();
+  }
+  return results; // relevance is original order
+}
+
+async function activateExpandedSearch(block, config, searchValue, cachedData) {
+  const value = (searchValue || '').trim();
+  if (value.length < 3) return;
+
+  // manage URL param
+  searchParams.set('q', value);
+  if (window.history.replaceState) {
+    const url = new URL(window.location.href);
+    url.search = searchParams.toString();
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  // close dropdown if open
+  const dropdown = block.querySelector('.search-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+  if (dropdown && dropdown.parentElement) dropdown.parentElement.classList.remove('open');
+
+  block.classList.add('expanded');
+  const { filters, results } = buildExpandedLayout(block);
+
+  // fetch/cached data
+  let data = cachedData || block._searchData;
+  if (!data) {
+    const fetched = (await fetchData(config.source)).filter((r) => !isExcludedResult(r));
+    const scope = getScopedPrefix(block);
+    data = applySearchPathFilter(fetched, scope);
+    block._searchData = data;
+  }
+
+  const searchPhrase = value.toLowerCase();
+  const searchTerms = searchPhrase.split(/\s+/).filter((t) => t && t.length >= 3);
+  const base = filterData(searchTerms, data, searchPhrase);
+
+  // state
+  let selectedPublishedRange = block._selectedPublishedRange || 'any';
+  let selectedModifiedRange = block._selectedModifiedRange || 'any';
+  let sortOrder = block._sortOrder || 'relevance';
+
+  const renderFilters = () => {
+    filters.innerHTML = '';
+    renderDateFilters(filters, selectedPublishedRange, (next) => {
+      selectedPublishedRange = next;
+      block._selectedPublishedRange = selectedPublishedRange;
+      renderList();
+    });
+    renderModifiedFilters(filters, selectedModifiedRange, (next) => {
+      selectedModifiedRange = next;
+      block._selectedModifiedRange = selectedModifiedRange;
+      renderList();
+    });
+    renderSortControls(filters, sortOrder, (next) => {
+      sortOrder = next;
+      block._sortOrder = sortOrder;
+      renderList();
+    });
+  };
+
+  const renderList = () => {
+    const filtered = applySort(applyAllFilters(base, selectedPublishedRange, selectedModifiedRange), sortOrder);
+    results.innerHTML = '';
+    if (!filtered.length) {
+      const msg = document.createElement('li');
+      msg.textContent = config.placeholders.searchNoResults || 'No results found.';
+      results.classList.add('no-results');
+      results.append(msg);
+      return;
+    }
+    results.classList.remove('no-results');
+    filtered.forEach((r) => results.append(renderResult(r, searchTerms, searchPhrase, results.dataset.h)));
+  };
+
+  renderFilters();
+  renderList();
+}
+
 export default async function decorate(block) {
   const placeholders = await fetchPlaceholders();
-  const source = block.querySelector('a[href]') ? block.querySelector('a[href]').href : '/query-index.json';
-  block.innerHTML = '';
-  block.append(
-    searchBox(block, { source, placeholders }),
-    searchResultsContainer(block),
-  );
+  // Determine source path from the first config row anchor, or existing anchor in block, or locale default
+  const configAnchor = block.querySelector(':scope > div:nth-child(1) a[href]');
+  const inlineAnchor = block.querySelector('a[href]');
+  const candidate = configAnchor?.href || inlineAnchor?.href || '';
+  const isJsonSource = candidate && /\.json(\?|$)/.test(candidate) && /query-index\.json(\?|$)/.test(candidate);
+  let source = isJsonSource ? candidate : '';
+  if (!source) {
+    const htmlLang = (document.documentElement.getAttribute('lang') || '').trim();
+    const langMatch = htmlLang.match(/^[a-z]{2}(?:-[A-Z]{2})?$/);
+    const locale = langMatch ? htmlLang.split('-')[0] : '';
+    source = `${locale ? `/${locale}` : ''}/query-index.json`;
+    // eslint-disable-next-line no-console
+    if (candidate && !isJsonSource) console.log('[search] ignoring non-JSON config anchor for source:', candidate);
+  }
+
+  // Read style from second row and hide first two rows (config rows)
+  try {
+    const styleText = block.querySelector(':scope > div:nth-child(2) > div p')?.textContent?.trim();
+    if (styleText) block.classList.add(styleText);
+    const row1 = block.querySelector(':scope > div:nth-child(1)');
+    const row2 = block.querySelector(':scope > div:nth-child(2)');
+    [row1, row2].forEach((r) => { if (r) r.style.display = 'none'; });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.log('[search] style/hide rows error', e);
+  }
+
+  // Variant selection via block classes
+  const useIconVariant = block.classList.contains('search-icon');
+  const useBarVariant = block.classList.contains('search-bar') || !useIconVariant;
+
+  if (useIconVariant) {
+    if (!block.classList.contains('search-icon')) block.classList.add('search-icon');
+    // icon variant: trigger opens overlay hosting search UI
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'search-trigger';
+    trigger.setAttribute('aria-label', 'Open search');
+    const icon = searchIcon();
+    trigger.append(icon);
+    const overlay = document.createElement('div');
+    overlay.className = 'search-overlay';
+    const panel = document.createElement('div');
+    panel.className = 'search-overlay-panel';
+    panel.append(
+      searchBox(block, { source, placeholders }),
+    );
+    overlay.append(panel);
+    block.append(trigger, overlay);
+
+    const openOverlay = () => {
+      overlay.classList.add('open');
+      const input = overlay.querySelector('input.search-input');
+      if (input) input.focus();
+    };
+    const closeOverlay = () => {
+      overlay.classList.remove('open');
+      clearSearch(block);
+    };
+
+    trigger.addEventListener('click', openOverlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeOverlay(); });
+
+    // Enter in icon variant should redirect to /{lang}/search?q=...
+    const getLocalePrefix = () => {
+      try {
+        const lang = getLanguage();
+        console.log('lang', lang);
+        return lang ? `/${lang}` : '';
+      } catch (e) {
+        const htmlLang = (document.documentElement.getAttribute('lang') || '').trim();
+        const langMatch = htmlLang.match(/^[a-z]{2}(?:-[A-Z]{2})?$/);
+        const locale = langMatch ? htmlLang.split('-')[0] : '';
+        return locale ? `/${locale}` : '';
+      }
+    };
+    const redirectToSearchPage = (query) => {
+      const targetPath = `${getLocalePrefix()}/search`;
+      const url = new URL(targetPath, window.location.origin);
+      if (query && query.trim()) url.searchParams.set('q', query.trim());
+      // Carry scoped search path to the search page if authored
+      attachScopeParam(url, getScopedPrefix(block));
+      window.location.href = url.toString();
+    };
+    const overlayInput = panel.querySelector('input.search-input');
+    if (overlayInput) {
+      overlayInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          redirectToSearchPage(overlayInput.value || '');
+        }
+      });
+    }
+  } else {
+    // bar variant: inline search box with dropdown beneath input
+    block.append(
+      searchBox(block, { source, placeholders }),
+    );
+
+    // Enter activates expanded mode
+    const input = block.querySelector('input.search-input');
+    input.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await activateExpandedSearch(block, { source, placeholders }, input.value);
+      }
+    });
+
+    // Ensure suggestions are hidden for search-bar variant
+    const dropdown = block.querySelector('.search-dropdown');
+    if (dropdown) dropdown.remove();
+  }
 
   if (searchParams.get('q')) {
     const input = block.querySelector('input');
     input.value = searchParams.get('q');
-    input.dispatchEvent(new Event('input'));
+    // Apply scoped path forwarded via 'sp' param (from search-icon overlay)
+    const forwardedScope = (new URL(window.location.href)).searchParams.get('sp') || '';
+    if (forwardedScope) {
+      block._forwardedScope = forwardedScope;
+    }
+    if (useBarVariant) {
+      await activateExpandedSearch(block, { source, placeholders }, input.value);
+    } else {
+      input.dispatchEvent(new Event('input'));
+    }
   }
 
   decorateIcons(block);
+
+  // close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!block.contains(e.target)) {
+      const dropdown = block.querySelector('.search-dropdown');
+      if (dropdown) dropdown.classList.remove('open');
+      if (dropdown && dropdown.parentElement) dropdown.parentElement.classList.remove('open');
+    }
+  });
+
+  // no special positioning logic needed; dropdown is positioned within box
 }

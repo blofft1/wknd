@@ -11,13 +11,19 @@ export default function decorate(block) {
   const enableUnderline = block.querySelector(':scope div:nth-child(3) > div')?.textContent?.trim() || 'true';
   
   // Get the layout Style from the block content (4th div)
-  const layoutStyle = block.querySelector(':scope div:nth-child(4) > div')?.textContent?.trim() || '';
+  const layoutStyle = block.querySelector(':scope div:nth-child(4) > div')?.textContent?.trim() || 'overlay';
 
   // Get the CTA style from the block content (5th div)
   const ctaStyle = block.querySelector(':scope div:nth-child(5) > div')?.textContent?.trim() || 'default';
-  
+
+  const backgroundStyle = block.querySelector(':scope div:nth-child(6) > div')?.textContent?.trim() || 'default';
+
   if(layoutStyle){
      block.classList.add(`${layoutStyle}`);
+  }
+
+  if(backgroundStyle){
+    block.classList.add(`${backgroundStyle}`);
   }
 
   // Add removeunderline class if underline is disabled
@@ -39,23 +45,25 @@ export default function decorate(block) {
     ctaStyleParagraph.style.display = 'none';
   }
 
-  const styleDiv = block.querySelector(':scope div:nth-child(5)');
-  if (styleDiv && styleDiv.textContent.trim() === ctaStyle) {
-    styleDiv.remove();
-  }
-
-  const layoutStyleDiv = block.querySelector(':scope div:nth-child(4)');
-  if (layoutStyleDiv) {
-    layoutStyleDiv.remove();
-  }
-  
   // Optional: Remove the configuration divs after reading them to keep the DOM clean
   const underlineDiv = block.querySelector(':scope div:nth-child(3)');
-  if (underlineDiv && underlineDiv.textContent.trim() === enableUnderline) {
-    underlineDiv.remove();
+  if (underlineDiv) {
+    underlineDiv.style.display = 'none';
   }
   
-  
+  const layoutStyleDiv = block.querySelector(':scope div:nth-child(4)');
+  if (layoutStyleDiv) {
+    layoutStyleDiv.style.display = 'none';
+  }
+
+  const ctaStyleDiv = block.querySelector(':scope div:nth-child(5)');
+  if (ctaStyleDiv) {
+    ctaStyleDiv.style.display = 'none';
+  }
+
+  const backgroundStyleDiv = block.querySelector(':scope div:nth-child(6)');
+  if (backgroundStyleDiv) {
+    backgroundStyleDiv.style.display = 'none';
+  }
+
 }
-
-
