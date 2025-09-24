@@ -1,4 +1,4 @@
-# AEM Reference Demo (for Edge Delivery Service experience)
+# AEM Reference Demo 2.0 (For Edge Delivery Service)
 
 **A customizable UI experience:**
 - Custom Themes (with and without code)
