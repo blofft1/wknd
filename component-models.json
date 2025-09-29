@@ -533,7 +533,7 @@
       {
         "component": "aem-content-fragment",
         "name": "reference",
-        "label": "Reference",
+        "label": "Content Fragment",
         "valueType": "string",
         "required": true,
         "validation": {
