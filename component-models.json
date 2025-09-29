@@ -531,7 +531,7 @@
     "id": "contentfragment",
     "fields": [
       {
-        "component": "aem-content",
+        "component": "aem-content-fragment",
         "name": "reference",
         "label": "Reference",
         "valueType": "string",
