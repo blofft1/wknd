@@ -60,13 +60,10 @@
     "id": "column",
     "components": [
       "button",
-      "dm-asset",
-      "dm-template",
       "image",
       "text",      
       "title",
-      "video",
-      "separator"
+      "video"
     ]
   },
   {
