@@ -1,6 +1,7 @@
 // Configuration reading is handled directly from block structure
 import { getMetadata } from '../../scripts/aem.js';
 import { isAuthorEnvironment } from '../../scripts/scripts.js';
+import { getHostname } from '../../scripts/utils.js';
 
 // Sample doctor data - in production, this would come from your data source
 const GRAPHQL_DOCTORS_BY_FOLDER_QUERY = '/graphql/execute.json/weHealthcare/GetDoctorsFromFolder';
@@ -421,7 +422,8 @@ async function fetchFromContentFragmentFolder(folderPath) {
     const decodedFolderPath = decodeURIComponent(folderPath);
     console.log('Decoded folder path:', decodedFolderPath);
 
-    const hostname = getMetadata('hostname');
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');
     const aemauthorurl = getMetadata('authorurl') || '';
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '') || '';
 

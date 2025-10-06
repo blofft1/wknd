@@ -1,5 +1,6 @@
 import { getMetadata, fetchPlaceholders } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { getHostname } from '../../scripts/utils.js';
 
 import {
   getNavigationMenu, formatNavigationJsonData,
@@ -387,7 +388,8 @@ async function applyCFTheme(themeCFReference) {
   
   try {
     const decodedThemeCFReference = decodeURIComponent(themeCFReference);
-    const hostname = getMetadata('hostname');
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');
     const aemauthorurl = getMetadata('authorurl') || '';
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '');
     const isAuthor = isAuthorEnvironment();

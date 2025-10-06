@@ -1,5 +1,6 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { isAuthorEnvironment, moveInstrumentation } from '../../scripts/scripts.js';
+import { getHostname } from '../../scripts/utils.js';
 
 /**
  * @param {HTMLElement} $block
@@ -107,7 +108,8 @@ export default async function decorate(block) {
       GRAPHQL_QUERY: '/graphql/execute.json/wknd-universal/DynamicMediaTemplateByPath'
     };
     
-    const hostname = getMetadata('hostname');	
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');	
     const aemauthorurl = getMetadata('authorurl') || '';
     
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '');  
