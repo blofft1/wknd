@@ -49,7 +49,7 @@ import { isAuthorEnvironment } from './scripts.js';
         const listOfAllPlaceholdersData = await fetchPlaceholders();
         const siteName = listOfAllPlaceholdersData?.siteName;
         if (siteName) {
-          return siteName;
+          return siteName.replaceAll('/content/', '');
         }
       }
     } catch (error) {
