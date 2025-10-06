@@ -24,7 +24,8 @@ import {
   formatDate,
   setPageLanguage,
   PATH_PREFIX,
-  createSource
+  createSource,
+  getHostname
 } from './utils.js';
 
 
@@ -196,6 +197,7 @@ async function renderWBDataLayer() {
   //const config = await fetchPlaceholders();
   const lastPubDateStr = getMetadata('published-time');
   const firstPubDateStr = getMetadata('content_date') || lastPubDateStr;
+  const hostnameFromPlaceholders = await getHostname();
   window.wbgData.page = {
     pageInfo: {
       pageCategory: getMetadata('pagecategory'),
@@ -204,7 +206,7 @@ async function renderWBDataLayer() {
       contentType: getMetadata('content_type'),
       pageUid: getMetadata('pageuid'),
       pageName: getMetadata('pagename'),
-      hostName: getMetadata('hostname'),
+      hostName: hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname'),
       pageFirstPub: formatDate(firstPubDateStr),
       pageLastMod: formatDate(lastPubDateStr),
       webpackage: '',
