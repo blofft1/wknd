@@ -69,7 +69,7 @@ import { isAuthorEnvironment } from './scripts.js';
 export async function getHostname() {
   try {
     const listOfAllPlaceholdersData = await fetchPlaceholders();
-    const hostname = listOfAllPlaceholdersData?.hostName;
+    const hostname = listOfAllPlaceholdersData?.hostname;
     if (hostname) {
       return hostname;
     }

@@ -1066,7 +1066,7 @@
         "component": "text",
         "valueType": "string",
         "value": "Your text will show here.",
-        "name": "teaserBlurb",
+        "name": "title",
         "label": "Title"
       },
       {
@@ -1166,7 +1166,7 @@
           {
             "component": "text",
             "valueType": "string",
-            "name": "btn-text",
+            "name": "buttonText",
             "value": "Button",
             "label": "Button Text"
           },

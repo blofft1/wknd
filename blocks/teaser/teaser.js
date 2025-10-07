@@ -107,7 +107,7 @@ function attachListeners() {
 
 export default function decorate(block) {
   const rteElementTag = Array.from(block.querySelectorAll('p'))
-    .find((el) => el.textContent.trim() === 'teaserBlurb');
+    .find((el) => el.textContent.trim() === 'title');
   const rteElement = rteElementTag?.parentElement?.nextElementSibling;
   const rteContent = rteElement?.querySelector('p')?.innerHTML;
   const sampleVideo = 'https://publish-p16362-e1620892.adobeaemcloud.com/content/dam/wknd-universal/wknd-banner.mp4';
@@ -132,7 +132,7 @@ export default function decorate(block) {
   const swooshSecond = `${window.hlx.codeBasePath}/icons/teaser_outerswoosh.svg`;
   const isVideo = (properties.teaserstyle && properties.teaserstyle === 'video');
   const videoAutoplay = (properties.videobehavior && properties.videobehavior === 'autoplay');
-  const buttonText = (properties['btn-text']) ? properties['btn-text'] : 'Button';
+  const buttonText = (properties['buttonText']) ? properties['buttonText'] : 'Button';
   const buttonStyle = (properties['btn-style']) ? properties['btn-style'] : 'dark-bg';
   const buttonLink = (properties['btn-link']) ? properties['btn-link'] : '';
   const videoReference = isVideo ? properties.videoreference : sampleVideo;
@@ -155,7 +155,7 @@ export default function decorate(block) {
     ),
   );
 
-  teaser.querySelector('.teaser-title').innerHTML = properties.teaserblurb ? rteContent : 'Title';
+  teaser.querySelector('.teaser-title').innerHTML = properties.title ? rteContent : 'Title';
   block.innerHTML = '';
   block.appendChild(teaser);
 
