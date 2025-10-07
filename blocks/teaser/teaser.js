@@ -110,7 +110,7 @@ export default function decorate(block) {
     .find((el) => el.textContent.trim() === 'title');
   const rteElement = rteElementTag?.parentElement?.nextElementSibling;
   const rteContent = rteElement?.querySelector('p')?.innerHTML;
-  const sampleVideo = 'https://publish-p16362-e1620892.adobeaemcloud.com/content/dam/wknd-universal/wknd-banner.mp4';
+  const sampleVideo = 'https://v.ftcdn.net/02/35/97/40/700_F_235974059_oVftmgBBJ32tgsDvxRdMdtpQDMfNFWEt_ST.mp4';
 
   const properties = readBlockConfig(block);
 
