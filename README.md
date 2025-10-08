@@ -1,3 +1,16 @@
+# 🚨 IMPORTANT NOTICE
+
+## 📦 Repository Has Moved!
+
+### 👉 [**Click here to go to the new repository → AEMXSC/RefDemoEDS**](https://github.com/AEMXSC/RefDemoEDS/)
+
+We’ve moved this project to a **new home** to better accommodate multiple **industry sources powered by the same shared codebase**.
+Please update your bookmarks and clone from the new location going forward.
+
+---
+
+## OLD Repository Info below
+
 # AEM Reference Demo (for Edge Delivery Service experience)
 
 **A customizable UI experience:**
