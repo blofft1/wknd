@@ -132,7 +132,7 @@ export default function decorate(block) {
   const swooshSecond = `${window.hlx.codeBasePath}/icons/teaser_outerswoosh.svg`;
   const isVideo = (properties.teaserstyle && properties.teaserstyle === 'video');
   const videoAutoplay = (properties.videobehavior && properties.videobehavior === 'autoplay');
-  const buttonText = (properties['buttonText']) ? properties['buttonText'] : 'Button';
+  const buttonText = (properties['buttontext']) ? properties['buttontext'] : 'Button';
   const buttonStyle = (properties['btn-style']) ? properties['btn-style'] : 'dark-bg';
   const buttonLink = (properties['btn-link']) ? properties['btn-link'] : '';
   const videoReference = isVideo ? properties.videoreference : sampleVideo;
