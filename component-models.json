@@ -67,6 +67,8 @@
           "component": "select",
           "name": "theme",
           "label": "Theme",
+          "description": "Note: This takes priority over CF based theme.",
+
           "options": [
             {
               "name": "default",
