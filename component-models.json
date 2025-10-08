@@ -16,21 +16,8 @@
       {
         "component": "text",
         "valueType": "string",
-        "name": "jcr:pagetitle",
-        "label": "Page Title"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
         "name": "jcr:description",
         "label": "Description"
-      },
-      {
-        "component": "aem-tag",
-        "name": "cq:tags",
-        "label": "Tags",
-        "valueType": "string",
-        "rootPath": "/content/cq:tags/reference-demo"
       },
       {
         "component": "aem-content-fragment",
@@ -87,8 +74,21 @@
       {
         "component": "text",
         "valueType": "string",
+        "name": "jcr:pagetitle",
+        "label": "Page Title"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
         "name": "pageCategory",
         "label": "Page Category"
+      },
+      {
+        "component": "aem-tag",
+        "name": "cq:tags",
+        "label": "Tags",
+        "valueType": "string",
+        "rootPath": "/content/cq:tags/reference-demo"
       }
     ]
   },
