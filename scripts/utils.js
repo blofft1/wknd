@@ -49,12 +49,33 @@ import { isAuthorEnvironment } from './scripts.js';
         const listOfAllPlaceholdersData = await fetchPlaceholders();
         const siteName = listOfAllPlaceholdersData?.siteName;
         if (siteName) {
-          return siteName;
+          return siteName.replaceAll('/content/', '');
         }
       }
     } catch (error) {
       console.warn('Error fetching placeholders for siteName:', error);
     }
+}
+
+
+/**
+ * Extracts the site name from the current URL pathname
+ * @description Extracts the site name from paths following the pattern /content/site-name/...
+ * For example:
+ * - From "/content/wknd-universal/language-masters/en/path" returns "wknd-universal"
+ * - From "/content/wknd-universal/language-masters/en/path/to/content.html" returns "wknd-universal"
+ * @returns {string} The site name extracted from the path, or empty string if not found
+ */
+export async function getHostname() {
+  try {
+    const listOfAllPlaceholdersData = await fetchPlaceholders();
+    const hostname = listOfAllPlaceholdersData?.hostname;
+    if (hostname) {
+      return hostname;
+    }
+  } catch (error) {
+    console.warn('Error fetching placeholders for hostname:', error);
+  }
 }
 
 

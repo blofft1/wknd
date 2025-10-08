@@ -29,7 +29,14 @@
       "form",
       "forex",
       "accordion",
-      "embed-adaptive-form"
+      "embed-adaptive-form",
+      "find-a-doctor"
+    ]
+  },
+  {
+    "id": "accordion",
+    "components": [
+      "accordion-item"
     ]
   },
   {
@@ -60,13 +67,10 @@
     "id": "column",
     "components": [
       "button",
-      "dm-asset",
-      "dm-template",
       "image",
       "text",      
       "title",
-      "video",
-      "separator"
+      "video"
     ]
   },
   {

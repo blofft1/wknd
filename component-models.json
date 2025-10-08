@@ -16,45 +16,11 @@
       {
         "component": "text",
         "valueType": "string",
-        "name": "jcr:pagetitle",
-        "label": "Page Title"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
         "name": "jcr:description",
         "label": "Description"
       },
       {
-        "component": "aem-tag",
-        "name": "cq:tags",
-        "label": "Tags",
-        "valueType": "string",
-        "rootPath": "/content/cq:tags/wknd-universal"
-      },
-      {
-        "component": "date-time",
-        "valueType": "date",
-        "value": "2024-09-23T00:00:00.000Z",
-        "name": "content_date",
-        "required": true,
-        "label": "Date Of Content creation"
-      },
-       {
-        "component": "text",
-        "valueType": "string",
-        "name": "hostname",
-        "label": "Hostname",
-        "description": "Provide the hostname of author instance (without the ending slash) e.g. https://author-pXXXXX-eXXXXXXX.adobeaemcloud.com"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
-        "name": "author",
-        "label": "Author"
-      },
-      {          
-        "component": "aem-content",
+        "component": "aem-content-fragment",
         "name": "theme_cf_reference",
         "label": "Brand Theme",
         "description": "Select the CF with authored values for the brand theme. This will be applied on the pages",
@@ -67,6 +33,8 @@
           "component": "select",
           "name": "theme",
           "label": "Theme",
+          "description": "Note: This takes priority over CF based theme.",
+
           "options": [
             {
               "name": "default",
@@ -87,6 +55,10 @@
              {
               "name": "Green Theme",
               "value": "green-theme"
+            },
+            {
+              "name": "WeHealthcare Theme",
+              "value": "wehealthcare-theme"
             }
           ]
       },
@@ -102,14 +74,21 @@
       {
         "component": "text",
         "valueType": "string",
-        "name": "pageName",
-        "label": "Page Name"
+        "name": "jcr:pagetitle",
+        "label": "Page Title"
       },
       {
         "component": "text",
         "valueType": "string",
         "name": "pageCategory",
         "label": "Page Category"
+      },
+      {
+        "component": "aem-tag",
+        "name": "cq:tags",
+        "label": "Tags",
+        "valueType": "string",
+        "rootPath": "/content/cq:tags/reference-demo"
       }
     ]
   },
@@ -531,22 +510,21 @@
     "id": "contentfragment",
     "fields": [
       {
-        "component": "aem-content",
+        "component": "aem-content-fragment",
         "name": "reference",
-        "label": "Reference",
+        "label": "Content Fragment Picker",
         "valueType": "string",
         "required": true,
-        "validation": {
-            "rootPath": "/content/dam"
-        }
+        "variationName": "contentFragmentVariation"
       },
       {
-         "component": "text",
-          "name": "variation",
-          "value": "",
-          "label": "Variation",
-          "valueType": "string",
-          "description": "Provide variation name to retrieve the CF content. If left empty, by default master variation will be used."
+        "component": "text",
+        "name": "contentFragmentVariation",
+        "label": "Selected Variation",
+        "value": "",
+        "valueType": "string",
+        "description": "Persisted variation for publish; leave empty for master.",
+        "condition": { "==": [ { "var": "__alwaysFalse" }, true ] }
       },
       {
         "component": "select",
@@ -667,14 +645,6 @@
           {
             "name": "Image Right",
             "value": "image-right"
-          },
-          {
-            "name": "Image Top",
-            "value": "image-top"
-          },
-          {
-            "name": "Image Bottom",
-            "value": "image-bottom"
           },
           {
             "name": "Image-Background Text-Left",
@@ -1063,7 +1033,7 @@
         "component": "text",
         "valueType": "string",
         "value": "Your text will show here.",
-        "name": "teaserBlurb",
+        "name": "title",
         "label": "Title"
       },
       {
@@ -1163,7 +1133,7 @@
           {
             "component": "text",
             "valueType": "string",
-            "name": "btn-text",
+            "name": "buttonText",
             "value": "Button",
             "label": "Button Text"
           },
@@ -6472,6 +6442,118 @@
         "value": "",
         "label": "Text",
         "valueType": "string"
+      }
+    ]
+  },
+  {
+    "id": "find-a-doctor",
+    "fields": [
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "title",
+        "label": "Title",
+        "value": "Find a Doctor"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "subtitle",
+        "label": "Subtitle",
+        "value": "Search for healthcare providers in your area"
+      },
+      {
+        "component": "select",
+        "name": "layout",
+        "label": "Layout Style",
+        "valueType": "string",
+        "value": "default",
+        "options": [
+          {
+            "name": "Default",
+            "value": "default"
+          },
+          {
+            "name": "Compact",
+            "value": "compact"
+          },
+          {
+            "name": "Expanded",
+            "value": "expanded"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "dataSourceType",
+        "label": "Data Source Type",
+        "valueType": "string",
+        "value": "content-fragments",
+        "options": [
+          {
+            "name": "Content Fragments",
+            "value": "content-fragments"
+          },
+          {
+            "name": "External API",
+            "value": "api"
+          }
+        ]
+      },
+        {
+          "component": "aem-content",
+          "name": "contentFragmentFolder",
+          "label": "Content Fragment Folder",
+          "description": "Select folder containing multiple doctor Content Fragments",
+          "valueType": "string",
+          "validation": {
+            "rootPath": "/content/dam"
+          },
+          "condition": { "==": [{ "var": "dataSourceType" }, "content-fragments"] }
+        },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "apiUrl",
+        "label": "API URL",
+        "description": "External API endpoint for doctor data",
+        "condition": { "==": [{ "var": "dataSourceType" }, "api"] }
+      },
+      {
+        "component": "boolean",
+        "name": "enableLocationSearch",
+        "label": "Enable Location Search",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableSpecialtyFilter",
+        "label": "Enable Specialty Filter",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableProviderNameSearch",
+        "label": "Enable Provider Name Search",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableSubmitAction",
+        "label": "Enable Submit Action",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "submitUrl",
+        "label": "Submit URL",
+        "description": "URL to redirect to when Book Appointment is clicked (if Submit Action is enabled)",
+        "condition": { "==": [{ "var": "enableSubmitAction" }, true] }
       }
     ]
   }

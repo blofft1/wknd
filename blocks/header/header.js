@@ -1,5 +1,6 @@
 import { getMetadata, fetchPlaceholders } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { getHostname } from '../../scripts/utils.js';
 
 import {
   getNavigationMenu, formatNavigationJsonData,
@@ -381,13 +382,14 @@ async function applyCFTheme(themeCFReference) {
   const CONFIG = {
     WRAPPER_SERVICE_URL: 'https://prod-60.eastus2.logic.azure.com:443/workflows/94ef4cd1fc1243e08aeab8ae74bc7980/triggers/manual/paths/invoke',
     WRAPPER_SERVICE_PARAMS: 'api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=e81iCCcESEf9NzzxLvbfMGPmredbADtTZSs8mspUTa4',
-    GRAPHQL_QUERY: '/graphql/execute.json/wknd-universal/BrandThemeByPath',
+    GRAPHQL_QUERY: '/graphql/execute.json/ref-demo-eds/BrandThemeByPath',
     EXCLUDED_THEME_KEYS: new Set(['brandSite', 'brandLogo'])
   };
   
   try {
     const decodedThemeCFReference = decodeURIComponent(themeCFReference);
-    const hostname = getMetadata('hostname');
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');
     const aemauthorurl = getMetadata('authorurl') || '';
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '');
     const isAuthor = isAuthorEnvironment();
@@ -651,4 +653,16 @@ export default async function decorate(block) {
   settingAltTextForSearchIcon();
   //fetchingPlaceholdersData();
   addLogoLink(langCode);
+    // Ensure search icon mask uses correct base path in UE/author/local
+    try {
+      const iconEl = document.querySelector('header .search.search-icon .icon');
+      if (iconEl && window.hlx && window.hlx.codeBasePath) {
+        const iconUrl = `${window.hlx.codeBasePath}/icons/search.svg`;
+        iconEl.style.webkitMask = `url(${iconUrl}) no-repeat center / contain`;
+        iconEl.style.mask = `url(${iconUrl}) no-repeat center / contain`;
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.debug('search icon mask init skipped', e);
+    }
 }
